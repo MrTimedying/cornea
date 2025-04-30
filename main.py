@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QThread, Slot
 from PySide6.QtGui import QImage, QPixmap
 
-# Assuming sidebar_widget.py is in a 'widgets' subfolder
+from widgets.databar_widget import DatabarContentWidget
 try:
     from widgets.sidebar_widget import SidebarContentWidget
 except ImportError as e:
@@ -65,7 +65,8 @@ class MainWindow(QMainWindow):
         self.central_layout.addWidget(self.start_stop_button, alignment=Qt.AlignCenter) # Button centered below
 
         # --- Create and Add Sidebar ---
-        self.create_sidebar() # <-- *** ADDED THIS CALL ***
+        self.create_sidebar()
+        self.create_databar() # <-- *** ADDED THIS CALL ***
 
         # --- Status Bar ---
         self.statusBar().showMessage("Ready") # Good practice to have a status bar
@@ -95,6 +96,25 @@ class MainWindow(QMainWindow):
         # Add the dock widget to the main window
         self.addDockWidget(Qt.LeftDockWidgetArea, self.sidebar_dock)
         print("Sidebar added to the main window.")
+
+    def create_databar(self):
+        print("Creating data widget")
+        self.databar_dock = QDockWidget("Tools", self)
+        self.databar_dock.setObjectName("DataOutputWidget")
+        self.databar_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+
+        try:
+            databar_content = DatabarContentWidget(self.databar_dock) 
+            self.databar_dock.setWidget(databar_content)
+        except Exception as e:
+             print(f"Error creating or setting SidebarContentWidget: {e}")
+             error_label = QLabel(f"Error loading sidebar content:\n{e}", self.databar_dock)
+             self.databar_dock.setWidget(error_label)
+
+
+        # Add the dock widget to the main window
+        self.addDockWidget(Qt.RightDockWidgetArea, self.databar_dock)
+        print("Data output bar added to the main window")
 
 
     def toggle_camera(self):
