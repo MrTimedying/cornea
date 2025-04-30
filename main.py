@@ -78,23 +78,16 @@ class MainWindow(QMainWindow):
         print("Main window initialized.")
 
     def create_sidebar(self):
-        """Creates the sidebar QDockWidget and adds it to the main window."""
         print("Creating sidebar...")
-        # Create the Dock Widget
         self.sidebar_dock = QDockWidget("Tools", self) # Title bar of the dock
-        # Corrected typo: SidebarDockWidget
         self.sidebar_dock.setObjectName("SidebarDockWidget")
-        # Allow docking only on left or right
         self.sidebar_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
 
-        # Create the content widget (from sidebar_widget.py)
         try:
-            sidebar_content = SidebarContentWidget(self.sidebar_dock) # Parent it to the dock
-             # Set the content widget inside the dock widget
+            sidebar_content = SidebarContentWidget(self.sidebar_dock) 
             self.sidebar_dock.setWidget(sidebar_content)
         except Exception as e:
              print(f"Error creating or setting SidebarContentWidget: {e}")
-             # Handle error, maybe show an error message in the dock
              error_label = QLabel(f"Error loading sidebar content:\n{e}", self.sidebar_dock)
              self.sidebar_dock.setWidget(error_label)
 
