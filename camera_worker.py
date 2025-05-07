@@ -14,7 +14,8 @@ class CameraWorker(QObject):
     """
     frame_ready = Signal(np.ndarray) # Emit numpy array frame (now annotated)
     finished = Signal()              # Signal when the run loop finishes
-    error = Signal(str)              # Signal for emitting error messages
+    error = Signal(str)             # Signal for emitting error messages
+    landmarks_ready = Signal(object)   # Signal for emitting landmarks positions           
 
     def __init__(self, camera_index=0, parent=None):
         super().__init__(parent)
@@ -90,10 +91,8 @@ class CameraWorker(QObject):
                     # The frame now potentially has the skeleton drawn on it
                     self.frame_ready.emit(annotated_frame)
 
-                    # Optional: If you need the raw landmark data for analysis later,
-                    # you could emit it via a separate signal here.
-                    # if pose_results and pose_results.pose_landmarks:
-                    #     self.landmarks_ready.emit(pose_results.pose_landmarks)
+                    if pose_results and pose_results.pose_landmarks:
+                        self.landmarks_ready.emit(pose_results.pose_landmarks)
 
                 except Exception as e:
                     print(f"CameraWorker: Error processing frame with MediaPipe: {e}")

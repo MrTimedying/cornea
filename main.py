@@ -12,7 +12,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QThread, Slot
 from PySide6.QtGui import QImage, QPixmap
-
 from widgets.databar_widget import DatabarContentWidget
 try:
     from widgets.sidebar_widget import SidebarContentWidget
@@ -33,7 +32,17 @@ from camera_worker import CameraWorker
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        
+        # Initialize storage first
+        self._widgets = {}
+        print(f"Debug: Widget dictionary initialized: {self._widgets}")
+        
+        # --- Camera Thread Variables ---
+        self.camera_thread = None
+        self.camera_worker = None
+        self.is_camera_running = False
 
+        # Window setup
         self.setWindowTitle("Gait Analyzer")
         # Increased default width slightly to accommodate sidebar comfortably
         self.setGeometry(100, 100, 950, 650)
@@ -71,12 +80,12 @@ class MainWindow(QMainWindow):
         # --- Status Bar ---
         self.statusBar().showMessage("Ready") # Good practice to have a status bar
 
-        # --- Camera Thread Variables ---
-        self.camera_thread = None
-        self.camera_worker = None
-        self.is_camera_running = False
-
         print("Main window initialized.")
+
+    @property
+    def databar_content(self):
+        """Safe access to databar widget"""
+        return self._widgets.get('databar')
 
     def create_sidebar(self):
         print("Creating sidebar...")
@@ -104,17 +113,30 @@ class MainWindow(QMainWindow):
         self.databar_dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
 
         try:
-            databar_content = DatabarContentWidget(self.databar_dock) 
-            self.databar_dock.setWidget(databar_content)
+            print("Creating DatabarContentWidget instance...")
+            # Create and store widget with explicit parent
+            databar_widget = DatabarContentWidget(parent=self)
+            print(f"Debug: Created databar_content - type: {type(databar_widget)}")
+            print(f"Debug: databar_content value: {databar_widget}")
+            
+            # Store in our widgets dictionary
+            self._widgets['databar'] = databar_widget
+            # Set as dock widget content
+            self.databar_dock.setWidget(databar_widget)
+            
+            print("DatabarContentWidget set as dock widget")
+            print(f"Debug: Widget parent after setting: {databar_widget.parent()}")
+            print(f"Debug: Is widget valid: {bool(databar_widget)}")
         except Exception as e:
-             print(f"Error creating or setting SidebarContentWidget: {e}")
-             error_label = QLabel(f"Error loading sidebar content:\n{e}", self.databar_dock)
-             self.databar_dock.setWidget(error_label)
+            print(f"Error creating or setting DatabarContentWidget: {e}")
+            error_label = QLabel(f"Error loading data content:\n{e}", self.databar_dock)
+            self.databar_dock.setWidget(error_label)
 
 
         # Add the dock widget to the main window
         self.addDockWidget(Qt.RightDockWidgetArea, self.databar_dock)
-        print("Data output bar added to the main window")
+        print(f"Data output bar added to the main window. Final databar_content: {self.databar_content}")
+        print(f"Debug: Final widget from dictionary: {self._widgets.get('databar')}")
 
 
     def toggle_camera(self):
@@ -142,9 +164,22 @@ class MainWindow(QMainWindow):
 
         self.camera_worker.moveToThread(self.camera_thread)
 
+        # Debug prints to check databar_content state
+        databar_widget = self.databar_content
+        print(f"Debug: databar_content property value: {databar_widget}")
+        print(f"Debug: databar_content property type: {type(databar_widget)}")
+        print(f"Debug: Raw widget dictionary value: {self._widgets.get('databar')}")
+        
         # Connect signals/slots
         self.camera_thread.started.connect(self.camera_worker.run)
         self.camera_worker.frame_ready.connect(self.update_video_label)
+        
+        # Use the databar widget from our property getter
+        if databar_widget is not None:
+            print("Connecting landmarks_ready signal to databar widget")
+            self.camera_worker.landmarks_ready.connect(databar_widget.update_landmarks_display)
+        else:
+            print("Warning: DatabarContentWidget instance is None, cannot connect landmarks signal.")
         self.camera_worker.finished.connect(self.on_camera_worker_finished)
         self.camera_worker.error.connect(self.on_camera_error)
 
@@ -262,25 +297,27 @@ class MainWindow(QMainWindow):
         print("Close event triggered. Stopping camera if running...")
         if self.is_camera_running and self.camera_worker:
             print("Requesting camera worker stop...")
-            self.camera_worker.stop() # Signal the worker loop to end
+            self.camera_worker.stop()  # Signal the worker loop to end
 
-            if self.camera_thread and self.camera_thread.isRunning():
+            # Store local reference to thread before potential cleanup
+            camera_thread = self.camera_thread
+            if camera_thread and camera_thread.isRunning():
                 print("Waiting for camera thread to finish...")
                 # Increased timeout slightly, adjust if needed
-                finished = self.camera_thread.wait(5000) # 5 seconds timeout
+                finished = camera_thread.wait(5000)  # 5 seconds timeout
                 if not finished:
                     print("Warning: Camera thread did not finish gracefully on close. Terminating.")
-                    self.camera_thread.terminate() # Force stop if wait fails
-                    self.camera_thread.wait() # Wait after terminate ensure resources are released
+                    camera_thread.terminate()  # Force stop if wait fails
+                    camera_thread.wait()  # Wait after terminate ensure resources are released
                 else:
                     print("Camera thread finished gracefully on close.")
             else:
-                 print("Camera thread was not running or already finished when closing.")
+                print("Camera thread was not running or already finished when closing.")
         else:
-             print("Camera was not running on close.")
+            print("Camera was not running on close.")
 
         print("Accepting close event.")
-        event.accept() # Accept the close event to allow window to close
+        event.accept()  # Accept the close event to allow window to close
 
 
 if __name__ == "__main__":
